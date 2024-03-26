@@ -12,7 +12,7 @@ The process involves installing the NVIDIA drivers, setting the GPU power limit,
 
 This guide assumes that we're working with a system with one or more Nvidia GPUs and an Intel CPU. It should be identical for an AMD CPU (but I haven't verified this). 
 
-The same cannot be said for AMD GPUs. Specifically for `ollama`, [there's work being done](https://github.com/ollama/ollama/issues/738#issuecomment-1974874171) to support ROCm but it still isn't stable in the way most people would hope it is for a reliable server. However, used Nvidia cards are a good deal nowadays (as of Mar 2024).
+[Ollama now natively supports AMD GPUs](https://ollama.com/blog/amd-preview) so those with AMD cards can now enjoy accelerated inference as well.
 
 This guide was built around the following system:
 - CPU: Intel Core i5-12600KF
