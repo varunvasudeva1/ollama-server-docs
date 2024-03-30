@@ -2,6 +2,19 @@
 
 _TL;DR_: A guide to setting up a server for running local language models using `ollama`.
 
+## Table of Contents
+
+- [Local LLaMA Server Setup Documentation](#local-llama-server-setup-documentation)
+  - [Table of Contents](#table-of-contents)
+  - [About](#about)
+  - [System Requirements](#system-requirements)
+  - [Essential Steps](#essential-steps)
+  - [Additional Steps](#additional-steps)
+  - [Accessing Ollama](#accessing-ollama)
+  - [Troubleshooting](#troubleshooting)
+  - [Notes](#notes)
+  - [References](#references)
+
 ## About
 
 This repository outlines the steps to run a server for running local language models. It uses Debian specifically, but most Linux distros should follow a very similar process. It aims to be a guide for Linux beginners like me who are setting up a server for the first time.
@@ -20,20 +33,20 @@ This guide was built around the following system:
 - Storage: 1TB M.2 NVMe SSD
 - GPU: Nvidia RTX 3090 24GB
 
-## Steps
+## Essential Steps
 
-1. #### Install Debian on the server
+1. ### Install Debian on the server
     - Download the [Debian ISO](https://www.debian.org/distrib/) from the official website.
     - Create a bootable USB using a tool like [Rufus](https://rufus.ie/en/) for Windows or [Balena Etcher](https://etcher.balena.io) for MacOS.
     - Boot into the USB and install Debian.
 
-2. #### Update the system
+2. ### Update the system
     - Run the following command:
         ```
         sudo apt update
         ```
 
-3. #### Install the NVIDIA drivers
+3. ### Install the NVIDIA drivers
     - Run the following commands:
         ```
         apt install linux-headers-amd64
@@ -45,7 +58,7 @@ This guide was built around the following system:
         nvidia-smi
         ```
 
-4. #### Install `ollama`
+4. ### Install `ollama`
     - Download `ollama` from the official repository:
         ```
         curl -fsSL https://ollama.com/install.sh | sh
@@ -67,9 +80,9 @@ This guide was built around the following system:
             systemctl restart ollama
             ```
     
-5. #### Create the `init.bash` script
+5. ### Create the `init.bash` script
 
-    This script will be run at boot to set the GPU power limit and start the server using `ollama`/`llama.cpp`. We set the GPU power limit lower because it has been seen in testing and inference that there is only a 5-15% performance decrease for a 50% reduction in power consumption. This is especially important for servers that are running 24/7.
+    This script will be run at boot to set the GPU power limit and start the server using `ollama`. We set the GPU power limit lower because it has been seen in testing and inference that there is only a 5-15% performance decrease for a 30% reduction in power consumption. This is especially important for servers that are running 24/7.
 
     - Run the following commands:
         ```
@@ -93,44 +106,7 @@ This guide was built around the following system:
         chmod +x init.bash
         ```
 
-6. #### Give `nvidia-persistenced` and `nvidia-smi` passwordless sudo permissions
-
-    We want `init.bash` to run the `nvidia-smi` commands without having to enter a password. This is done by editing the `sudoers` file.
-
-    - Run the following command:
-        ```
-        sudo visudo
-        ```
-    - Add the following lines to the file:
-        ```
-        (username) ALL=(ALL) NOPASSWD: /usr/bin/nvidia-persistenced
-        (username) ALL=(ALL) NOPASSWD: /usr/bin/nvidia-smi
-        ```
-        > Replace `(username)` with your username.
-
-        > **IMPORTANT**: Ensure that you add these lines AFTER `%sudo ALL=(ALL:ALL) ALL`. The order of the lines in the file matters - the last matching line will be used so if you add these lines before `%sudo ALL=(ALL:ALL) ALL`, they will be ignored.
-    - Save and exit the file.
-
-7. #### Configure auto-login
-
-    When the server boots up, we want it to automatically log in to a user account and run the `init.bash` script. This is done by configuring the `lightdm` display manager.
-
-    - Run the following command:
-        ```
-        sudo nano /etc/lightdm/lightdm.conf
-        ```
-    - Find the following commented line. It should be in the `[Seat:*]` section.
-        ```
-        # autologin-user=
-        ```
-    - Uncomment the line and add your username:
-        ```
-        autologin-user=(username)
-        ```
-        > Replace `(username)` with your username.
-    - Save and exit the file.
-
-8. #### Add `init.bash` to the crontab
+6. ### Add `init.bash` to the crontab
 
     Adding the `init.bash` script to the crontab will schedule it to run at boot.
 
@@ -150,9 +126,48 @@ This guide was built around the following system:
         ```
     - Save and exit the file.
 
-9. #### (Optional) Enable SSH
+7. ### Give `nvidia-persistenced` and `nvidia-smi` passwordless `sudo` permissions
 
-    Enabling SSH allows you to connect to the server remotely.
+    We want `init.bash` to run the `nvidia-smi` commands without having to enter a password. This is done by editing the `sudoers` file.
+
+    - Run the following command:
+        ```
+        sudo visudo
+        ```
+    - Add the following lines to the file:
+        ```
+        (username) ALL=(ALL) NOPASSWD: /usr/bin/nvidia-persistenced
+        (username) ALL=(ALL) NOPASSWD: /usr/bin/nvidia-smi
+        ```
+        > Replace `(username)` with your username.
+
+        > **IMPORTANT**: Ensure that you add these lines AFTER `%sudo ALL=(ALL:ALL) ALL`. The order of the lines in the file matters - the last matching line will be used so if you add these lines before `%sudo ALL=(ALL:ALL) ALL`, they will be ignored.
+    - Save and exit the file.
+
+8. ### Configure auto-login
+
+    When the server boots up, we want it to automatically log in to a user account and run the `init.bash` script. This is done by configuring the `lightdm` display manager.
+
+    - Run the following command:
+        ```
+        sudo nano /etc/lightdm/lightdm.conf
+        ```
+    - Find the following commented line. It should be in the `[Seat:*]` section.
+        ```
+        # autologin-user=
+        ```
+    - Uncomment the line and add your username:
+        ```
+        autologin-user=(username)
+        ```
+        > Replace `(username)` with your username.
+    - Save and exit the file.
+
+## Additional Steps
+
+- ### SSH
+
+    Enabling SSH allows you to connect to the server remotely. After configuring SSH, you can connect to the server from another device on the same network using an SSH client like PuTTY or the terminal. This lets you run your server headlessly without needing a monitor, keyboard, or mouse after the initial setup.
 
     On the server:
     - Run the following command:
@@ -181,9 +196,56 @@ This guide was built around the following system:
 
     If you expect to tunnel into your server often, I recommend following [this guide](https://www.raspberrypi.com/documentation/computers/remote-access.html#configure-ssh-without-a-password) to enable passwordless SSH using `ssh-keygen` and `ssh-copy-id`. It worked perfectly on my Debian system despite having been written for Raspberry Pi OS.
 
+- ### Open WebUI
+
+    In this step, we'll install Docker and Open WebUI. Docker is a containerization platform that allows you to run applications in isolated environments. Open WebUI is a web-based interface for managing Ollama models and chats, and provides a beautiful, performant UI for communicating with your models.
+
+    You will want to do this if you want to access your models from a web interface. If you're fine with using the command line or want to consume models through a plugin/extension, you can skip this step.
+
+    #### Docker
+
+    This subsection follows [this guide](https://docs.docker.com/engine/install/debian/) to install Docker Engine on Debian.
+    
+    - Run the following commands:
+        ```
+        # Add Docker's official GPG key:
+        sudo apt-get update
+        sudo apt-get install ca-certificates curl
+        sudo install -m 0755 -d /etc/apt/keyrings
+        sudo curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+        sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+        # Add the repository to Apt sources:
+        echo \
+        "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
+        $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+        sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+        sudo apt-get update
+        ```
+    - Install the Docker packages:
+        ```
+        sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+        ```
+    - Verify the installation:
+        ```
+        sudo docker run hello-world
+        ```
+
+    #### Open WebUI
+
+    Now that Docker is installed, we can install Open WebUI. Run the following command:
+    
+    ```
+    docker run -d -p 3000:8080 --add-host=host.docker.internal:host-gateway -v open-webui:/app/backend/data --name open-webui --restart always ghcr.io/open-webui/open-webui:main
+    ```
+
+    You can access it by navigating to `http://localhost:3000` in your browser or `http://(server IP):3000` from another device on the same network. There's no need to add this to the `init.bash` script as Open WebUI will start automatically at boot via Docker Engine.
+
+    Read more about Open WebUI [here](https://github.com/open-webui/open-webui).
+
 ## Accessing Ollama
 
-Accessing `ollama` on the server itself is trivial. Simply run:
+This section deals with accessing `ollama` from an extension/application/plugin where you have to specify the base URL to access your `ollama` models. Accessing `ollama` on the server itself is trivial. To test your endpoint, simply run:
 ```
 curl http://localhost:11434/api/generate -d '{
   "model": "llama2",
@@ -207,13 +269,14 @@ Refer to [Ollama's REST API docs](https://github.com/ollama/ollama/blob/main/doc
     ```
   - Retry the remaining steps.
 - If you still can't connect to your API endpoint, check your firewall settings. [This guide to UFW (Uncomplicated Firewall) on Debian](https://www.digitalocean.com/community/tutorials/how-to-set-up-a-firewall-with-ufw-on-debian-10) is a good resource.
+- If you encounter an issue using `ssh-copy-id` to set up passwordless SSH, try running `ssh-keygen -t rsa` on the client before running `ssh-copy-id`. This generates the RSA key pair that `ssh-copy-id` needs to copy to the server.
 
 ## Notes
 
 - This is my first foray into setting up a server and ever working with Linux so there may be better ways to do some of the steps. I will update this repository as I learn more.
 - I chose Debian because it is, apparently, one of the most stable Linux distros. I also went with an XFCE desktop environment because it is lightweight and I wasn't yet comfortable going full command line.
 - The power draw of my EVGA FTW3 Ultra RTX 3090 was 350W at stock settings. I set the power limit to 250W and the performance decrease was negligible for my use case, which is primarily code completion in VS Code and the Q&A via chat.
-- Use a user for auto-login, don't log in as root.
+- Use a user for auto-login, don't log in as root unless for a specific reason.
 
 ## References
 
@@ -247,4 +310,6 @@ Passwordless `ssh`:
 
 Docs:
 
-https://github.com/ollama/ollama/blob/main/docs/api.md
+- https://github.com/ollama/ollama/blob/main/docs/api.md
+- https://docs.docker.com/engine/install/debian/
+- https://github.com/open-webui/open-webui
