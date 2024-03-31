@@ -8,10 +8,12 @@ _TL;DR_: A guide to setting up a server for running local language models using 
   - [Table of Contents](#table-of-contents)
   - [About](#about)
   - [System Requirements](#system-requirements)
-  - [Essential Steps](#essential-steps)
-  - [Additional Steps](#additional-steps)
+  - [Prerequisites](#prerequisites)
+  - [Essential Setup](#essential-setup)
+  - [Additional Setup](#additional-setup)
   - [Accessing Ollama](#accessing-ollama)
   - [Troubleshooting](#troubleshooting)
+  - [Monitoring](#monitoring)
   - [Notes](#notes)
   - [References](#references)
 
@@ -23,47 +25,70 @@ The process involves installing the NVIDIA drivers, setting the GPU power limit,
 
 ## System Requirements
 
-This guide assumes that we're working with a system with one or more Nvidia GPUs and an Intel CPU. It should be identical for an AMD CPU (but I haven't verified this). 
+Any modern CPU and GPU combination should work for this guide. Previously, compatibility with AMD GPUs was an issue but the latest releases of `ollama` have worked through this and [AMD GPUs are now supported natively](https://ollama.com/blog/amd-preview). 
 
-[Ollama now natively supports AMD GPUs](https://ollama.com/blog/amd-preview) so those with AMD cards can now enjoy accelerated inference as well.
-
-This guide was built around the following system:
+For reference, this guide was built around the following system:
 - CPU: Intel Core i5-12600KF
 - Memory: 32GB 6000 MHz DDR5 RAM
 - Storage: 1TB M.2 NVMe SSD
 - GPU: Nvidia RTX 3090 24GB
 
-## Essential Steps
+> Note for AMD users: Power limiting is skipped for AMD GPUs as [AMD has recently made it difficult to set power limits on their GPUs](https://www.reddit.com/r/linux_gaming/comments/1b6l1tz/no_more_power_limiting_for_amd_gpus_because_it_is/). Naturally, skip any steps involving `nvidia-smi` or `nvidia-persistenced` and the power limit in the `init.bash` script.
 
-1. ### Install Debian on the server
-    - Download the [Debian ISO](https://www.debian.org/distrib/) from the official website.
-    - Create a bootable USB using a tool like [Rufus](https://rufus.ie/en/) for Windows or [Balena Etcher](https://etcher.balena.io) for MacOS.
-    - Boot into the USB and install Debian.
+> Note for CPU-only users: You can skip the driver installation and power limiting steps. The rest of the guide should work as expected.
 
-2. ### Update the system
+## Prerequisites
+
+- Fresh install of Debian
+- Internet connection
+- Basic understanding of the Linux terminal
+- Peripherals like a monitor, keyboard, and mouse
+
+To install Debian on your newly built server hardware,
+
+- Download the [Debian ISO](https://www.debian.org/distrib/) from the official website.
+- Create a bootable USB using a tool like [Rufus](https://rufus.ie/en/) for Windows or [Balena Etcher](https://etcher.balena.io) for MacOS.
+- Boot into the USB and install Debian.
+
+For a more detailed guide on installing Debian, refer to the [official documentation](https://www.debian.org/releases/buster/amd64/). For those who aren't yet experienced with Linux, I recommend using the graphical installer - you will be given an option between the text-based installer and graphical installer. 
+
+I also recommend installing a lightweight desktop environment like XFCE for ease of use. Other options like GNOME or KDE are also available - GNOME may be a better option for those using their server as a primary workstation as it is more feature-rich (and, as such, heavier) than XFCE.
+
+## Essential Setup
+
+1. ### Update the system
     - Run the following command:
         ```
         sudo apt update
         ```
 
-3. ### Install the NVIDIA drivers
-    - Run the following commands:
-        ```
-        apt install linux-headers-amd64
-        apt install nvidia-driver firmware-misc-nonfree
-        ```
-    - Reboot the server.
-    - Run the following command to verify the installation:
-        ```
-        nvidia-smi
-        ```
+2. ### Install drivers
+    - #### Nvidia
+      - Run the following commands:
+          ```
+          apt install linux-headers-amd64
+          apt install nvidia-driver firmware-misc-nonfree
+          ```
+      - Reboot the server.
+      - Run the following command to verify the installation:
+          ```
+          nvidia-smi
+          ```
+    
+    - #### AMD
+      - Run the following commands:
+          ```
+          deb http://deb.debian.org/debian bookworm main contrib non-free-firmware
+          apt-get install firmware-amd-graphics libgl1-mesa-dri libglx-mesa0 mesa-vulkan-drivers xserver-xorg-video-all
+          ```
+      - Reboot the server.
 
-4. ### Install `ollama`
+3. ### Install `ollama`
     - Download `ollama` from the official repository:
         ```
         curl -fsSL https://ollama.com/install.sh | sh
         ```
-    - (Recommended) We want our LLM API endpoint to be reachable by the rest of the LAN. For `ollama`, this means setting `OLLAMA_HOST=0.0.0.0` in the `ollama.service`. 
+    - (Recommended) We want our API endpoint to be reachable by the rest of the LAN. For `ollama`, this means setting `OLLAMA_HOST=0.0.0.0` in the `ollama.service`. 
       - Run the following command to edit the service:
         ```
         systemctl edit ollama.service
@@ -80,7 +105,7 @@ This guide was built around the following system:
             systemctl restart ollama
             ```
     
-5. ### Create the `init.bash` script
+4. ### Create the `init.bash` script
 
     This script will be run at boot to set the GPU power limit and start the server using `ollama`. We set the GPU power limit lower because it has been seen in testing and inference that there is only a 5-15% performance decrease for a 30% reduction in power consumption. This is especially important for servers that are running 24/7.
 
@@ -100,13 +125,19 @@ This guide was built around the following system:
         > Replace `(power limit)` with the desired power limit in watts. For example, `sudo nvidia-smi -pl 250`.
 
         > Replace `(model)` with the name of the model you want to run. For example, `ollama run mistral:latest`.
+
+        For multiple GPUs, modify the script to set the power limit for each GPU:
+        ```
+        sudo nvidia-smi -i 0 -pl (power limit)
+        sudo nvidia-smi -i 1 -pl (power limit)
+        ```
     - Save and exit the script.
     - Make the script executable:
         ```
         chmod +x init.bash
         ```
 
-6. ### Add `init.bash` to the crontab
+5. ### Add `init.bash` to the crontab
 
     Adding the `init.bash` script to the crontab will schedule it to run at boot.
 
@@ -126,9 +157,11 @@ This guide was built around the following system:
         ```
     - Save and exit the file.
 
-7. ### Give `nvidia-persistenced` and `nvidia-smi` passwordless `sudo` permissions
+6. ### Give `nvidia-persistenced` and `nvidia-smi` passwordless `sudo` permissions
 
     We want `init.bash` to run the `nvidia-smi` commands without having to enter a password. This is done by editing the `sudoers` file.
+
+    AMD users can skip this step as power limiting is not supported on AMD GPUs.
 
     - Run the following command:
         ```
@@ -144,7 +177,7 @@ This guide was built around the following system:
         > **IMPORTANT**: Ensure that you add these lines AFTER `%sudo ALL=(ALL:ALL) ALL`. The order of the lines in the file matters - the last matching line will be used so if you add these lines before `%sudo ALL=(ALL:ALL) ALL`, they will be ignored.
     - Save and exit the file.
 
-8. ### Configure auto-login
+7. ### Configure auto-login
 
     When the server boots up, we want it to automatically log in to a user account and run the `init.bash` script. This is done by configuring the `lightdm` display manager.
 
@@ -163,7 +196,7 @@ This guide was built around the following system:
         > Replace `(username)` with your username.
     - Save and exit the file.
 
-## Additional Steps
+## Additional Setup
 
 - ### SSH
 
@@ -194,7 +227,7 @@ This guide was built around the following system:
         ```
         > Replace `(username)` with your username and `(ip address)` with the server's IP address.
 
-    If you expect to tunnel into your server often, I recommend following [this guide](https://www.raspberrypi.com/documentation/computers/remote-access.html#configure-ssh-without-a-password) to enable passwordless SSH using `ssh-keygen` and `ssh-copy-id`. It worked perfectly on my Debian system despite having been written for Raspberry Pi OS.
+    If you expect to tunnel into your server often, I highly recommend following [this guide](https://www.raspberrypi.com/documentation/computers/remote-access.html#configure-ssh-without-a-password) to enable passwordless SSH using `ssh-keygen` and `ssh-copy-id`. It worked perfectly on my Debian system despite having been written for Raspberry Pi OS.
 
 - ### Open WebUI
 
@@ -271,6 +304,14 @@ Refer to [Ollama's REST API docs](https://github.com/ollama/ollama/blob/main/doc
 - If you still can't connect to your API endpoint, check your firewall settings. [This guide to UFW (Uncomplicated Firewall) on Debian](https://www.digitalocean.com/community/tutorials/how-to-set-up-a-firewall-with-ufw-on-debian-10) is a good resource.
 - If you encounter an issue using `ssh-copy-id` to set up passwordless SSH, try running `ssh-keygen -t rsa` on the client before running `ssh-copy-id`. This generates the RSA key pair that `ssh-copy-id` needs to copy to the server.
 
+## Monitoring
+
+- To monitor GPU usage, power draw, and temperature, you can use the `nvidia-smi` command. To monitor GPU usage, run:
+    ```
+    watch -n 1 nvidia-smi
+    ```
+    This will update the GPU usage every second without cluttering the terminal environment. Press `Ctrl+C` to exit.
+
 ## Notes
 
 - This is my first foray into setting up a server and ever working with Linux so there may be better ways to do some of the steps. I will update this repository as I learn more.
@@ -282,6 +323,9 @@ Refer to [Ollama's REST API docs](https://github.com/ollama/ollama/blob/main/doc
 
 Downloading Nvidia drivers: 
 - https://wiki.debian.org/NvidiaGraphicsDrivers
+
+Downloading AMD drivers:
+- https://wiki.debian.org/AtiHowTo
 
 Secure Boot:
 - https://askubuntu.com/a/927470
@@ -310,6 +354,7 @@ Passwordless `ssh`:
 
 Docs:
 
+- https://www.debian.org/releases/buster/amd64/
 - https://github.com/ollama/ollama/blob/main/docs/api.md
 - https://docs.docker.com/engine/install/debian/
 - https://github.com/open-webui/open-webui
