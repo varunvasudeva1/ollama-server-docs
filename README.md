@@ -229,6 +229,30 @@ I also recommend installing a lightweight desktop environment like XFCE for ease
 
     If you expect to tunnel into your server often, I highly recommend following [this guide](https://www.raspberrypi.com/documentation/computers/remote-access.html#configure-ssh-without-a-password) to enable passwordless SSH using `ssh-keygen` and `ssh-copy-id`. It worked perfectly on my Debian system despite having been written for Raspberry Pi OS.
 
+- ### Firewall
+
+    Setting up a firewall is essential for securing your server. The Uncomplicated Firewall (UFW) is a simple and easy-to-use firewall for Linux. You can use UFW to allow or deny incoming and outgoing traffic to and from your server.
+
+    - Install UFW:
+        ```
+        sudo apt install ufw
+        ```
+    - Allow SSH, HTTPS, and any other ports you need:
+        ```
+        sudo ufw allow ssh https 3000 11434 80 8080
+        ```
+        Here, we're allowing SSH (port 22), HTTPS (port 443), Open WebUI (port 3000), Ollama API (port 11434), HTTP (port 80), and Docker (port 8080). You can add or remove ports as needed.
+    - Enable UFW:
+        ```
+        sudo ufw enable
+        ```
+    - Check the status of UFW:
+        ```
+        sudo ufw status
+        ```
+
+    Refer to [this guide](https://www.digitalocean.com/community/tutorials/how-to-set-up-a-firewall-with-ufw-on-debian-10) for more information on setting up UFW.
+
 - ### Open WebUI
 
     In this step, we'll install Docker and Open WebUI. Docker is a containerization platform that allows you to run applications in isolated environments. Open WebUI is a web-based interface for managing Ollama models and chats, and provides a beautiful, performant UI for communicating with your models.
