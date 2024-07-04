@@ -1,6 +1,6 @@
 # Local LLaMA Server Setup Documentation
 
-_TL;DR_: A guide to setting up a fully local and private language model server using [`ollama`](https://ollama.com).
+_TL;DR_: A guide to setting up a fully local and private language model server and TTS-equipped web UI, using [`ollama`](https://github.com/ollama/ollama), [Open WebUI](https://github.com/open-webui/open-webui), and [OpenedAI Speech](https://github.com/matatonic/openedai-speech).
 
 ## Table of Contents
 
@@ -13,21 +13,31 @@ _TL;DR_: A guide to setting up a fully local and private language model server u
   - [Additional Setup](#additional-setup)
     - [SSH](#ssh)
     - [Firewall](#firewall)
+    - [Docker](#docker)
     - [Open WebUI](#open-webui)
-      - [Docker](#docker)
-      - [Open WebUI](#open-webui-1)
     - [OpenedAI Speech](#openedai-speech)
       - [Open WebUI Integration](#open-webui-integration)
       - [Downloading Voices](#downloading-voices)
-  - [Accessing Ollama](#accessing-ollama)
-  - [Troubleshooting](#troubleshooting)
-    - [Nvidia drivers](#nvidia-drivers)
-    - [`ollama`](#ollama)
-    - [`ssh`](#ssh-1)
-    - [Open WebUI](#open-webui-2)
+  - [Verifying](#verifying)
+    - [Ollama](#ollama)
+    - [Open WebUI](#open-webui-1)
     - [OpenedAI Speech](#openedai-speech-1)
+  - [Updating](#updating)
+    - [General](#general)
+    - [Nvidia Drivers \& CUDA](#nvidia-drivers--cuda)
+    - [Ollama](#ollama-1)
+    - [Open WebUI](#open-webui-2)
+    - [OpenedAI Speech](#openedai-speech-2)
+  - [Troubleshooting](#troubleshooting)
+    - [`ssh`](#ssh-1)
+    - [Nvidia drivers](#nvidia-drivers)
+    - [Ollama](#ollama-2)
+    - [Open WebUI](#open-webui-3)
+    - [OpenedAI Speech](#openedai-speech-3)
   - [Monitoring](#monitoring)
   - [Notes](#notes)
+    - [Software](#software)
+    - [Hardware](#hardware)
   - [References](#references)
   - [Acknowledgements](#acknowledgements)
 
@@ -71,17 +81,19 @@ I also recommend installing a lightweight desktop environment like XFCE for ease
 ## Essential Setup
 
 1. ### Update the system
-    - Run the following command:
+    - Run the following commands:
         ```
         sudo apt update
+        sudo apt upgrade
         ```
 
 2. ### Install drivers
     - #### Nvidia
+      - Follow Nvidia's [guide on downloading CUDA Toolkit](https://developer.nvidia.com/cuda-downloads?target_os=Linux&target_arch=x86_64&Distribution=Debian). The instructions are specific to your machine and the website will lead you to them interactively.
       - Run the following commands:
           ```
-          apt install linux-headers-amd64
-          apt install nvidia-driver firmware-misc-nonfree
+          sudo apt install linux-headers-amd64
+          sudo apt install nvidia-driver firmware-misc-nonfree
           ```
       - Reboot the server.
       - Run the following command to verify the installation:
@@ -267,15 +279,9 @@ Setting up a firewall is essential for securing your server. The Uncomplicated F
 
 Refer to [this guide](https://www.digitalocean.com/community/tutorials/how-to-set-up-a-firewall-with-ufw-on-debian-10) for more information on setting up UFW.
 
-### Open WebUI
+### Docker
 
-In this step, we'll install Docker and Open WebUI. Docker is a containerization platform that allows you to run applications in isolated environments. Open WebUI is a web-based interface for managing Ollama models and chats, and provides a beautiful, performant UI for communicating with your models.
-
-You will want to do this if you want to access your models from a web interface. If you're fine with using the command line or want to consume models through a plugin/extension, you can skip this step.
-
-#### Docker
-
-This subsection follows [this guide](https://docs.docker.com/engine/install/debian/) to install Docker Engine on Debian.
+Docker is a containerization platform that allows you to run applications in isolated environments. This subsection follows [this guide](https://docs.docker.com/engine/install/debian/) to install Docker Engine on Debian.
 
 - Run the following commands:
     ```
@@ -302,9 +308,11 @@ This subsection follows [this guide](https://docs.docker.com/engine/install/debi
     sudo docker run hello-world
     ```
 
-#### Open WebUI
+### Open WebUI
 
-Now that Docker is installed, we can install Open WebUI. To install without Nvidia GPU support, run the following command:
+Open WebUI is a web-based interface for managing Ollama models and chats, and provides a beautiful, performant UI for communicating with your models. You will want to do this if you want to access your models from a web interface. If you're fine with using the command line or want to consume models through a plugin/extension, you can skip this step.
+
+To install without Nvidia GPU support, run the following command:
 ```
 sudo docker run -d -p 3000:8080 --add-host=host.docker.internal:host-gateway -v open-webui:/app/backend/data --name open-webui --restart always ghcr.io/open-webui/open-webui:main
 ```
@@ -316,81 +324,40 @@ sudo docker run -d -p 3000:8080 --gpus all --add-host=host.docker.internal:host-
 
 You can access it by navigating to `http://localhost:3000` in your browser or `http://(server_IP):3000` from another device on the same network. There's no need to add this to the `init.bash` script as Open WebUI will start automatically at boot via Docker Engine.
 
-To update Open WebUI once, run the following command:
-```
-docker run --rm --volume /var/run/docker.sock:/var/run/docker.sock containrrr/watchtower --run-once open-webui
-```
-
-To keep it updated automatically, run the following command:
-```
-docker run -d --name watchtower --volume /var/run/docker.sock:/var/run/docker.sock containrrr/watchtower open-webui
-```
-
 Read more about Open WebUI [here](https://github.com/open-webui/open-webui).
 
 ### OpenedAI Speech
 
 OpenedAI Speech is a text-to-speech server that wraps [Piper TTS](https://github.com/rhasspy/piper) and [Coqui XTTS v2](https://docs.coqui.ai/en/latest/models/xtts.html) in an OpenAI-compatible API. This is great because it plugs in easily to the Open WebUI interface, giving your models the ability to speak their responses.
 
-> WARNING: The documentation for this project leaves a little to be desired. I've run into a plethora of issues trying to get it to work and almost all of it has been trial and error by going through the code. I've done my best to provide a comprehensive guide here but be prepared to troubleshoot in case things have changed when you download it.
+> As of v0.17 (compared to v0.10), OpenedAI Speech features a far more straightforward and automated Docker installation, making it easy to get up and running.
 
-Piper TTS is a more lightweight, less performant model that is great for quick responses - it can also run CPU-only inference, which may be a better fit for systems that need to reserve as much VRAM for language models as possible. XTTS is a more performant model that requires a GPU for inference. Piper is:
+Piper TTS is a lightweight model that is great for quick responses - it can also run CPU-only inference, which may be a better fit for systems that need to reserve as much VRAM for language models as possible. XTTS is a more performant model that requires a GPU for inference. Piper is:
 
 1) generally easier to setup with out-of-the-box CUDA acceleration, and,
-2) has a plethora of voices that can be found [here](https://rhasspy.github.io/piper-samples/), so it's what I would suggest you start with.
+2) has a plethora of voices that can be found [here](https://rhasspy.github.io/piper-samples/), so it's what I would suggest starting with.
 
 - To install OpenedAI Speech, first clone the repository and navigate to the directory:
     ```
     git clone https://github.com/matatonic/openedai-speech
     cd openedai-speech
     ```
-- Create a new virtual environment named `speech` and activate it. Then, install `piper-tts`:
-    ```
-    python3 -m venv speech
-    source speech/bin/activate
-    pip install piper-tts
-    ```
-    This is a minimal virtual environment that is only required to run the script that downloads voices.
-- Download the relevant voices. If you intend to use both Piper and XTTS, download both. Otherwise, download the specific voices you need:
-    ```
-    # for tts-1 / piper
-    bash download_voices_tts-1.sh
-    # for tts-1-hd / xtts
-    bash download_voices_tts-1-hd.sh
-    ```
 - Copy the `sample.env` file to `speech.env`:
     ```
     cp sample.env speech.env
     ```
-- To use the container as a service, also uncomment the following line:
+- Run the following command to start the server.
+  - Nvidia GPUs
     ```
-    #restart: unless-stopped
+    sudo docker compose up -d
     ```
-- Edit the `speech.env` file:
-    - #### Using Piper
-        
-        To use Piper as the default model, no changes are required. 
-        
-        To *only* use Piper and never load XTTS, uncomment the following `CLI_COMMAND` line:
-        ```
-        #CLI_COMMAND="python speech.py --xtts_device none"
-        ```
-
-        To use CUDA acceleration with Piper, add the following `CLI_COMMAND` line:
-        ```
-        CLI_COMMAND="python speech.py --piper_cuda"
-        ```
-
-    - #### Using XTTS
-        
-        Uncomment the `PRELOAD_MODEL` and `CLI_COMMAND` lines:
-        ```
-        #PRELOAD_MODEL=xtts
-        #CLI_COMMAND="python speech.py --preload $PRELOAD_MODEL"
-        ```
-- Run the following command to start the server:
+  - AMD GPUs
     ```
-    docker compose up -d
+    sudo docker compose -d docker-compose.rocm.yml up
+    ```
+  - CPU only
+    ```
+    sudo docker compose -f docker-compose.min.yml up
     ```
 
 OpenedAI Speech runs on `0.0.0.0:8000` by default. You can access it by navigating to `http://localhost:8000` in your browser or `http://(server_IP):8000` from another device on the same network without any additional changes.
@@ -410,35 +377,46 @@ To integrate your OpenedAI Speech server with Open WebUI, navigate to the `Audio
 #### Downloading Voices
 
 We'll use Piper here because I haven't found any good resources for high quality .wav files for XTTS. The process is the same for both models, just replace `tts-1` with `tts-1-hd` in the following commands. We'll download the `en_GB-alba-medium` voice as an example.
-```
-bash download_voices_tts-1.sh en_GB-alba-medium
-```
 
-Update the `voice_to_speaker.yaml` file to include the voice you downloaded. This file maps the voice to a speaker name that can be used in the Open WebUI interface. For example, to map the `en_GB-alba-medium` voice to the speaker name `alba`, add the following lines to the file:
-```
-alba:
-    model: voices/en_GB-alba-medium.onnx
-    speaker: # default speaker
-```
-Run the following command:
-```
-sudo docker ps -a
-```
-Identify the container IDs of
-1) OpenedAI Speech
-2) Open WebUI
+- Create a new virtual environment named `speech` and activate it. Then, install `piper-tts`:
+    ```
+    python3 -m venv speech
+    source speech/bin/activate
+    pip install piper-tts
+    ```
+    This is a minimal virtual environment that is only required to run the script that downloads voices.
+- Download the voice:
+    ```
+    bash download_voices_tts-1.sh en_GB-alba-medium
+    ```
+- Update the `voice_to_speaker.yaml` file to include the voice you downloaded. This file maps the voice to a speaker name that can be used in the Open WebUI interface. For example, to map the `en_GB-alba-medium` voice to the speaker name `alba`, add the following lines to the file:
+    ```
+    alba:
+        model: voices/en_GB-alba-medium.onnx
+        speaker: # default speaker
+    ```
+- Run the following command:
+    ```
+    sudo docker ps -a
+    ```
+    Identify the container IDs of
+    1) OpenedAI Speech
+    2) Open WebUI
 
-Restart both containers:
-```
-sudo docker restart (openedai_speech_container_ID)
-sudo docker restart (open_webui_container_ID)
-```
+    Restart both containers:
+    ```
+    sudo docker restart (openedai_speech_container_ID)
+    sudo docker restart (open_webui_container_ID)
+    ```
+    > Replace `(openedai_speech_container_ID)` and `(open_webui_container_ID)` with the container IDs you identified.
 
-> Replace `(openedai_speech_container_ID)` and `(open_webui_container_ID)` with the container IDs you identified.
+## Verifying
 
-## Accessing Ollama
+This section isn't strictly necessary by any means - if you use all the elements in the guide, a good experience in Open WebUI means you've succeeded with the goal of the guide. However, it can be helpful to test the disparate installations at different stages in this process.
 
-This section deals with accessing `ollama` from an extension/application/plugin where you have to specify the base URL to access your `ollama` models. Accessing `ollama` on the server itself is trivial. To test your endpoint, simply run:
+### Ollama
+
+To test your Ollama installation and endpoint, simply run:
 ```
 curl http://localhost:11434/api/generate -d '{
   "model": "llama2",
@@ -447,18 +425,87 @@ curl http://localhost:11434/api/generate -d '{
 ```
 > Replace `llama2` with your preferred model.
 
-Assuming the `OLLAMA_HOST` environment variable has been set to `0.0.0.0`, accessing `ollama` from anywhere on the network is still trivial! Simply replace `localhost` with your server's IP.
+Since the OLLAMA_HOST environment variable is set to 0.0.0.0, it's easy to access `ollama` from anywhere on the network. To do so, simply update the `localhost` reference in your URL or command to match the IP address of your server.
 
 Refer to [Ollama's REST API docs](https://github.com/ollama/ollama/blob/main/docs/api.md) for more information on the entire API.
+
+### Open WebUI
+
+Visit `http://localhost:3000`. If you're greeted by the authentication page, you've successfully installed Open WebUI.
+
+### OpenedAI Speech
+
+To test your TTS server and endpoint, run the following command:
+```
+curl -s http://localhost:8000/v1/audio/speech -H "Content-Type: application/json" -d '{
+    "input": "The quick brown fox jumped over the lazy dog."}' > speech.mp3
+```
+
+If you see the `speech.mp3` file in the OpenedAI Speech directory, you should be good to go. If you're paranoid like I am, test it using a player like `aplay`. Run the following commands (from the OpenedAI Speech directory):
+```
+sudo apt install aplay
+aplay speech.mp3
+```
+
+## Updating
+
+Updating your system is a good idea to keep software running optimally and with the latest security patches. Updates to Ollama (a Docker-based wrapper around `llama.cpp`) allow for inference from new model architectures and updates to Open WebUI enable new features like voice calling, function calling, pipelines, and more.
+
+I've compiled steps to update these "primary function" installations in a standalone section because I think it'd be easier to come back to one section instead of hunting for update instructions in multiple subsections.
+
+### General
+
+Upgrade Debian packages by running the following commands:
+```
+sudo apt update
+sudo apt upgrade
+```
+
+### Nvidia Drivers & CUDA
+
+Follow Nvidia's guide [here](https://developer.nvidia.com/cuda-downloads?target_os=Linux&target_arch=x86_64&Distribution=Debian) to install the latest CUDA drivers.
+
+> IMPORTANT: Don't skip this step. Not installing the latest drivers after upgrading Debian packages will throw your installations out of sync, leading to broken functionality. When updating, target everything important at once. Also, rebooting after this step is a good idea to ensure that your system is operating as expected after upgrading these crucial drivers.
+
+### Ollama
+
+Rerun the command that installs Ollama - it acts as an updater too:
+```
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+### Open WebUI
+
+To update Open WebUI once, run the following command:
+```
+docker run --rm --volume /var/run/docker.sock:/var/run/docker.sock containrrr/watchtower --run-once open-webui
+```
+
+To keep it updated automatically, run the following command:
+```
+docker run -d --name watchtower --volume /var/run/docker.sock:/var/run/docker.sock containrrr/watchtower open-webui
+```
+
+### OpenedAI Speech
+
+Navigate to the directory and pull the latest image from Docker:
+```
+cd openedai-speech
+sudo docker compose pull
+sudo docker compose up -d
+```
 
 ## Troubleshooting
 
 For any service running in a container, you can check the logs by running `sudo docker logs -f (container_ID)`. If you're having trouble with a service, this is a good place to start.
 
+### `ssh`
+- If you encounter an issue using `ssh-copy-id` to set up passwordless SSH, try running `ssh-keygen -t rsa` on the client before running `ssh-copy-id`. This generates the RSA key pair that `ssh-copy-id` needs to copy to the server.
+
 ### Nvidia drivers
 - Disable Secure Boot in the BIOS if you're having trouble with the Nvidia drivers not working. For me, all packages were at the latest versions and `nvidia-detect` was able to find my GPU correctly, but `nvidia-smi` kept returning the `NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver` error. [Disabling Secure Boot](https://askubuntu.com/a/927470) fixed this for me. Better practice than disabling Secure Boot is to sign the Nvidia drivers yourself but I didn't want to go through that process for a non-critical server that can afford to have Secure Boot disabled.
 
-### `ollama`
+### Ollama
 - If you receive the `Failed to open "/etc/systemd/system/ollama.service.d/.#override.confb927ee3c846beff8": Permission denied` error from Ollama after running `systemctl edit ollama.service`, simply creating the file works to eliminate it. Use the following steps to edit the file. 
   - Run:
     ```
@@ -467,9 +514,6 @@ For any service running in a container, you can check the logs by running `sudo 
     ```
   - Retry the remaining steps.
 - If you still can't connect to your API endpoint, check your firewall settings. [This guide to UFW (Uncomplicated Firewall) on Debian](https://www.digitalocean.com/community/tutorials/how-to-set-up-a-firewall-with-ufw-on-debian-10) is a good resource.
-
-### `ssh`
-- If you encounter an issue using `ssh-copy-id` to set up passwordless SSH, try running `ssh-keygen -t rsa` on the client before running `ssh-copy-id`. This generates the RSA key pair that `ssh-copy-id` needs to copy to the server.
 
 ### Open WebUI
 - If you encounter `Ollama: llama runner process has terminated: signal: killed`, check your `Advanced Parameters`, under `Settings > General > Advanced Parameters`. For me, bumping the context length past what certain models could handle was breaking the `ollama` server. Leave it to the default (or higher, but make sure it's still under the limit for the model you're using) to fix this issue.
@@ -502,24 +546,33 @@ For any service running in a container, you can check the logs by running `sudo 
 
 ## Monitoring
 
-- To monitor GPU usage, power draw, and temperature, you can use the `nvidia-smi` command. To monitor GPU usage, run:
-    ```
-    watch -n 1 nvidia-smi
-    ```
-    This will update the GPU usage every second without cluttering the terminal environment. Press `Ctrl+C` to exit.
+To monitor GPU usage, power draw, and temperature, you can use the `nvidia-smi` command. To monitor GPU usage, run:
+```
+watch -n 1 nvidia-smi
+```
+This will update the GPU usage every second without cluttering the terminal environment. Press `Ctrl+C` to exit.
 
 ## Notes
 
-- This is my first foray into setting up a server and ever working with Linux so there may be better ways to do some of the steps. I will update this repository as I learn more.
+This is my first foray into setting up a server and ever working with Linux so there may be better ways to do some of the steps. I will update this repository as I learn more.
+
+### Software
+
 - I chose Debian because it is, apparently, one of the most stable Linux distros. I also went with an XFCE desktop environment because it is lightweight and I wasn't yet comfortable going full command line.
-- The power draw of my EVGA FTW3 Ultra RTX 3090 was 350W at stock settings. I set the power limit to 250W and the performance decrease was negligible for my use case, which is primarily code completion in VS Code and the Q&A via chat.
 - Use a user for auto-login, don't log in as root unless for a specific reason.
 - If something using a Docker container doesn't work, try running `sudo docker ps -a` to see if the container is running. If it isn't, try running `sudo docker compose up -d` again. If it is and isn't working, try running `sudo docker restart (container_ID)` to restart the container.
 - If something isn't working no matter what you do, try rebooting the server. It's a common solution to many problems. Try this before spending hours troubleshooting. Sigh.
 
+### Hardware
+
+- The power draw of my EVGA FTW3 Ultra RTX 3090 was 350W at stock settings. I set the power limit to 250W and the performance decrease was negligible for my use case, which is primarily code completion in VS Code and the Q&A via chat. 
+- Using a power monitor, I measured the power draw of my server for multiple days - the running average is ~60W. The power can spike to 350W during prompt processing and token generation, but this only lasts for a few seconds. For the remainder of the generation time, it tended to stay at the 250W power limit and dropped back to the average power draw after the model wasn't in use for about 20 seconds. 
+- Ensure your power supply has enough headroom for transient spikes (particularly in multi GPU setups) or you may face random shutdowns. Your GPU can blow past its rated power draw and also any software limit you set for it based on the chip's actual draw. I usually aim for +50% of my setup's estimated total power draw.
+
 ## References
 
-Downloading Nvidia drivers: 
+Downloading Nvidia drivers:
+- https://developer.nvidia.com/cuda-downloads?target_os=Linux&target_arch=x86_64&Distribution=Debian
 - https://wiki.debian.org/NvidiaGraphicsDrivers
 
 Downloading AMD drivers:
