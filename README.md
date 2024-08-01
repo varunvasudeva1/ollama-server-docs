@@ -7,6 +7,7 @@ _TL;DR_: A guide to setting up a fully local and private language model server a
 - [Local LLaMA Server Setup Documentation](#local-llama-server-setup-documentation)
   - [Table of Contents](#table-of-contents)
   - [About](#about)
+  - [Priorities](#priorities)
   - [System Requirements](#system-requirements)
   - [Prerequisites](#prerequisites)
   - [Essential Setup](#essential-setup)
@@ -30,7 +31,7 @@ _TL;DR_: A guide to setting up a fully local and private language model server a
     - [OpenedAI Speech](#openedai-speech-2)
   - [Troubleshooting](#troubleshooting)
     - [`ssh`](#ssh-1)
-    - [Nvidia drivers](#nvidia-drivers)
+    - [Nvidia Drivers](#nvidia-drivers)
     - [Ollama](#ollama-2)
     - [Open WebUI](#open-webui-3)
     - [OpenedAI Speech](#openedai-speech-3)
@@ -47,6 +48,14 @@ This repository outlines the steps to run a server for running local language mo
 
 The process involves installing the NVIDIA drivers, setting the GPU power limit, and configuring the server to run `ollama` at boot. It also includes setting up auto-login and scheduling the `init.bash` script to run at boot. All these settings are based on my ideal setup for a language model server that runs most of the day but a lot can be customized to suit your needs. For example, you can use any OpenAI-compatible server like [`llama.cpp`](https://github.com/ggerganov/llama.cpp) or [LM Studio](https://lmstudio.ai) instead of `ollama`.
 
+## Priorities
+
+- **Simplicity of setup process**: It should be relatively straightforward to set up the components of the solution.
+- **Stability of runtime**: The components should be stable and capable of running for weeks at a time without any intervention necessary.
+- **Ease of maintenance**: The components and their interactions should be uncomplicated enough that you know enough to maintain them as they evolve (because they *will* evolve).
+- **Aesthetics**: The result should be as close to a cloud provider's chat platform as possible. A homelab solution doesn't necessarily need to feel like it was cobbled together haphazardly.
+- **Open source**: The code should be able to be verified by a community of engineers. Chat platforms and LLMs involve large amounts of personal data conveyed in natural language and it's important to know that data isn't going outside your machine.
+
 ## System Requirements
 
 Any modern CPU and GPU combination should work for this guide. Previously, compatibility with AMD GPUs was an issue but the latest releases of `ollama` have worked through this and [AMD GPUs are now supported natively](https://ollama.com/blog/amd-preview). 
@@ -57,9 +66,11 @@ For reference, this guide was built around the following system:
 - Storage: 1TB M.2 NVMe SSD
 - GPU: Nvidia RTX 3090 24GB
 
-> Note for AMD users: Power limiting is skipped for AMD GPUs as [AMD has recently made it difficult to set power limits on their GPUs](https://www.reddit.com/r/linux_gaming/comments/1b6l1tz/no_more_power_limiting_for_amd_gpus_because_it_is/). Naturally, skip any steps involving `nvidia-smi` or `nvidia-persistenced` and the power limit in the `init.bash` script.
+> [!NOTE] AMD GPU
+> Power limiting is skipped for AMD GPUs as [AMD has recently made it difficult to set power limits on their GPUs](https://www.reddit.com/r/linux_gaming/comments/1b6l1tz/no_more_power_limiting_for_amd_gpus_because_it_is/). Naturally, skip any steps involving `nvidia-smi` or `nvidia-persistenced` and the power limit in the `init.bash` script.
 
-> Note for CPU-only users: You can skip the driver installation and power limiting steps. The rest of the guide should work as expected.
+> [!NOTE] CPU-only
+> You can skip the GPU driver installation and power limiting steps. The rest of the guide should work as expected.
 
 ## Prerequisites
 
@@ -200,7 +211,8 @@ I also recommend installing a lightweight desktop environment like XFCE for ease
         ```
         > Replace `(username)` with your username.
 
-        > **IMPORTANT**: Ensure that you add these lines AFTER `%sudo ALL=(ALL:ALL) ALL`. The order of the lines in the file matters - the last matching line will be used so if you add these lines before `%sudo ALL=(ALL:ALL) ALL`, they will be ignored.
+        > [!IMPORTANT]
+        > Ensure that you add these lines AFTER `%sudo ALL=(ALL:ALL) ALL`. The order of the lines in the file matters - the last matching line will be used so if you add these lines before `%sudo ALL=(ALL:ALL) ALL`, they will be ignored.
     - Save and exit the file.
 
 7. ### Configure auto-login
@@ -253,7 +265,8 @@ On the client:
     ```
     > Replace `(username)` with your username and `(ip_address)` with the server's IP address.
 
-If you expect to tunnel into your server often, I highly recommend following [this guide](https://www.raspberrypi.com/documentation/computers/remote-access.html#configure-ssh-without-a-password) to enable passwordless SSH using `ssh-keygen` and `ssh-copy-id`. It worked perfectly on my Debian system despite having been written for Raspberry Pi OS.
+> [!NOTE]
+> If you expect to tunnel into your server often, I highly recommend following [this guide](https://www.raspberrypi.com/documentation/computers/remote-access.html#configure-ssh-without-a-password) to enable passwordless SSH using `ssh-keygen` and `ssh-copy-id`. It worked perfectly on my Debian system despite having been written for Raspberry Pi OS.
 
 ### Firewall
 
@@ -370,8 +383,10 @@ To integrate your OpenedAI Speech server with Open WebUI, navigate to the `Audio
 - API Key: `anything-you-like`
 - Set Model: `tts-1` (for Piper) or `tts-1-hd` (for XTTS)
 
+> [!NOTE]
 > `host.docker.internal` is a magic hostname that resolves to the internal IP address assigned to the host by Docker. This allows containers to communicate with services running on the host, such as databases or web servers, without needing to know the host's IP address. It simplifies communication between containers and host-based services, making it easier to develop and deploy applications.
 
+> [!NOTE]
 > The TTS engine is set to `OpenAI` because OpenedAI Speech is OpenAI-compatible. There is no data transfer between OpenAI and OpenedAI Speech - the API is simply a wrapper around Piper and XTTS.
 
 #### Downloading Voices
@@ -465,7 +480,8 @@ sudo apt upgrade
 
 Follow Nvidia's guide [here](https://developer.nvidia.com/cuda-downloads?target_os=Linux&target_arch=x86_64&Distribution=Debian) to install the latest CUDA drivers.
 
-> IMPORTANT: Don't skip this step. Not installing the latest drivers after upgrading Debian packages will throw your installations out of sync, leading to broken functionality. When updating, target everything important at once. Also, rebooting after this step is a good idea to ensure that your system is operating as expected after upgrading these crucial drivers.
+> [!WARNING]
+> Don't skip this step. Not installing the latest drivers after upgrading Debian packages will throw your installations out of sync, leading to broken functionality. When updating, target everything important at once. Also, rebooting after this step is a good idea to ensure that your system is operating as expected after upgrading these crucial drivers.
 
 ### Ollama
 
@@ -502,7 +518,7 @@ For any service running in a container, you can check the logs by running `sudo 
 ### `ssh`
 - If you encounter an issue using `ssh-copy-id` to set up passwordless SSH, try running `ssh-keygen -t rsa` on the client before running `ssh-copy-id`. This generates the RSA key pair that `ssh-copy-id` needs to copy to the server.
 
-### Nvidia drivers
+### Nvidia Drivers
 - Disable Secure Boot in the BIOS if you're having trouble with the Nvidia drivers not working. For me, all packages were at the latest versions and `nvidia-detect` was able to find my GPU correctly, but `nvidia-smi` kept returning the `NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver` error. [Disabling Secure Boot](https://askubuntu.com/a/927470) fixed this for me. Better practice than disabling Secure Boot is to sign the Nvidia drivers yourself but I didn't want to go through that process for a non-critical server that can afford to have Secure Boot disabled.
 
 ### Ollama
@@ -618,4 +634,7 @@ Docs:
 
 Cheers to all the fantastic work done by the open-source community. This guide wouldn't exist without the effort of the many contributors to the projects and guides referenced here. 
 
-Please star any projects you find useful and consider contributing to them if you can. Stars on this guide would also be appreciated if you found it helpful, as it helps others find it too.
+To stay up-to-date on the latest developments in the field of machine learning, LLMs, and other vision/speech models, check out [r/LocalLLaMA](https://reddit.com/localllama).
+
+> [!NOTE]
+> Please star any projects you find useful and consider contributing to them if you can. Stars on this guide would also be appreciated if you found it helpful, as it helps others find it too. 
