@@ -121,27 +121,35 @@ I also recommend installing a lightweight desktop environment like XFCE for ease
       - Reboot the server.
 
 3. ### Install `ollama`
+
+    Ollama, a Docker-based wrapper of `llama.cpp`, serves the inference engine and enables inference from the language models you will download. It'll be installed as a service, so it runs automatically at boot.
+
     - Download `ollama` from the official repository:
         ```
         curl -fsSL https://ollama.com/install.sh | sh
         ```
-    - (Recommended) We want our API endpoint to be reachable by the rest of the LAN. For `ollama`, this means setting `OLLAMA_HOST=0.0.0.0` in the `ollama.service`. 
-      - Run the following command to edit the service:
+
+    We want our API endpoint to be reachable by the rest of the LAN. For `ollama`, this means setting `OLLAMA_HOST=0.0.0.0` in the `ollama.service`. 
+
+    - Run the following command to edit the service:
         ```
         systemctl edit ollama.service
         ```
-      - Find the `[Service]` section and add `Environment="OLLAMA_HOST=0.0.0.0"` under it. It should look like this:
+    - Find the `[Service]` section and add `Environment="OLLAMA_HOST=0.0.0.0"` under it. It should look like this:
         ```
         [Service]
         Environment="OLLAMA_HOST=0.0.0.0"
         ```
-       - Save and exit.
-       - Reload the environment.
-            ```
-            systemctl daemon-reload
-            systemctl restart ollama
-            ```
-    
+    - Save and exit.
+    - Reload the environment.
+        ```
+        systemctl daemon-reload
+        systemctl restart ollama
+        ```
+
+    > [!TIP]
+    > If you installed `ollama` manually or don't use it as a service, remember to run `ollama serve` to properly start the server. Refer to [Ollama's troubleshooting steps](#ollama-2) if you encounter an error.
+
 4. ### Create the `init.bash` script
 
     This script will be run at boot to set the GPU power limit and start the server using `ollama`. We set the GPU power limit lower because it has been seen in testing and inference that there is only a 5-15% performance decrease for a 30% reduction in power consumption. This is especially important for servers that are running 24/7.
@@ -156,12 +164,8 @@ I also recommend installing a lightweight desktop environment like XFCE for ease
         #!/bin/bash
         sudo nvidia-smi -pm 1
         sudo nvidia-smi -pl (power_limit)
-        ollama run (model)
-        ollama serve
         ```
         > Replace `(power_limit)` with the desired power limit in watts. For example, `sudo nvidia-smi -pl 250`.
-
-        > Replace `(model)` with the name of the model you want to run. For example, `ollama run mistral:latest`.
 
         For multiple GPUs, modify the script to set the power limit for each GPU:
         ```
@@ -522,6 +526,16 @@ For any service running in a container, you can check the logs by running `sudo 
 - Disable Secure Boot in the BIOS if you're having trouble with the Nvidia drivers not working. For me, all packages were at the latest versions and `nvidia-detect` was able to find my GPU correctly, but `nvidia-smi` kept returning the `NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver` error. [Disabling Secure Boot](https://askubuntu.com/a/927470) fixed this for me. Better practice than disabling Secure Boot is to sign the Nvidia drivers yourself but I didn't want to go through that process for a non-critical server that can afford to have Secure Boot disabled.
 
 ### Ollama
+- If you receive the `could not connect to ollama app, is it running?` error, your `ollama` instance wasn't served properly. This could be because of a manual installation or the desire to use it at-will and not as a service. To run the `ollama` server once, run:
+    ```
+    ollama serve
+    ```
+    Then, **in a new terminal**, you should be able to access your models regularly by running:
+    ```
+    ollama run (model)
+    ```
+    For detailed instructions on _manually_ configuring `ollama` to run as a service (to run automatically at boot), read the official documentation [here](https://github.com/ollama/ollama/blob/main/docs/linux.md). You shouldn't need to do this unless your system faces restrictions using Ollama's automated installer.
+    
 - If you receive the `Failed to open "/etc/systemd/system/ollama.service.d/.#override.confb927ee3c846beff8": Permission denied` error from Ollama after running `systemctl edit ollama.service`, simply creating the file works to eliminate it. Use the following steps to edit the file. 
   - Run:
     ```
