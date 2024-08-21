@@ -11,6 +11,15 @@ _TL;DR_: A guide to setting up a fully local and private language model server a
   - [System Requirements](#system-requirements)
   - [Prerequisites](#prerequisites)
   - [Essential Setup](#essential-setup)
+    - [General](#general)
+    - [Drivers](#drivers)
+      - [Nvidia GPUs](#nvidia-gpus)
+      - [AMD GPUs](#amd-gpus)
+    - [Ollama](#ollama)
+    - [Startup Script](#startup-script)
+    - [Scheduling Startup Script](#scheduling-startup-script)
+    - [Configuring Script Permissions](#configuring-script-permissions)
+    - [Configuring Auto-Login](#configuring-auto-login)
   - [Additional Setup](#additional-setup)
     - [SSH](#ssh)
     - [Firewall](#firewall)
@@ -20,19 +29,19 @@ _TL;DR_: A guide to setting up a fully local and private language model server a
       - [Open WebUI Integration](#open-webui-integration)
       - [Downloading Voices](#downloading-voices)
   - [Verifying](#verifying)
-    - [Ollama](#ollama)
+    - [Ollama](#ollama-1)
     - [Open WebUI](#open-webui-1)
     - [OpenedAI Speech](#openedai-speech-1)
   - [Updating](#updating)
-    - [General](#general)
+    - [General](#general-1)
     - [Nvidia Drivers \& CUDA](#nvidia-drivers--cuda)
-    - [Ollama](#ollama-1)
+    - [Ollama](#ollama-2)
     - [Open WebUI](#open-webui-2)
     - [OpenedAI Speech](#openedai-speech-2)
   - [Troubleshooting](#troubleshooting)
     - [`ssh`](#ssh-1)
     - [Nvidia Drivers](#nvidia-drivers)
-    - [Ollama](#ollama-2)
+    - [Ollama](#ollama-3)
     - [Open WebUI](#open-webui-3)
     - [OpenedAI Speech](#openedai-speech-3)
   - [Monitoring](#monitoring)
@@ -91,152 +100,155 @@ I also recommend installing a lightweight desktop environment like XFCE for ease
 
 ## Essential Setup
 
-1. ### Update the system
-    - Run the following commands:
-        ```
-        sudo apt update
-        sudo apt upgrade
-        ```
+### General
+Update the system by running the following commands:
+```
+sudo apt update
+sudo apt upgrade
+```
 
-2. ### Install drivers
-    - #### Nvidia
-      - Follow Nvidia's [guide on downloading CUDA Toolkit](https://developer.nvidia.com/cuda-downloads?target_os=Linux&target_arch=x86_64&Distribution=Debian). The instructions are specific to your machine and the website will lead you to them interactively.
-      - Run the following commands:
-          ```
-          sudo apt install linux-headers-amd64
-          sudo apt install nvidia-driver firmware-misc-nonfree
-          ```
-      - Reboot the server.
-      - Run the following command to verify the installation:
-          ```
-          nvidia-smi
-          ```
-    
-    - #### AMD
-      - Run the following commands:
-          ```
-          deb http://deb.debian.org/debian bookworm main contrib non-free-firmware
-          apt-get install firmware-amd-graphics libgl1-mesa-dri libglx-mesa0 mesa-vulkan-drivers xserver-xorg-video-all
-          ```
-      - Reboot the server.
+### Drivers
 
-3. ### Install `ollama`
+Now, we'll install the required GPU drivers that allow programs to utilize their compute capabilities.
 
-    Ollama, a Docker-based wrapper of `llama.cpp`, serves the inference engine and enables inference from the language models you will download. It'll be installed as a service, so it runs automatically at boot.
+#### Nvidia GPUs
+- Follow Nvidia's [guide on downloading CUDA Toolkit](https://developer.nvidia.com/cuda-downloads?target_os=Linux&target_arch=x86_64&Distribution=Debian). The instructions are specific to your machine and the website will lead you to them interactively.
+- Run the following commands:
+    ```
+    sudo apt install linux-headers-amd64
+    sudo apt install nvidia-driver firmware-misc-nonfree
+    ```
+- Reboot the server.
+- Run the following command to verify the installation:
+    ```
+    nvidia-smi
+    ```
+  
+#### AMD GPUs
+- Run the following commands:
+    ```
+    deb http://deb.debian.org/debian bookworm main contrib non-free-firmware
+    apt-get install firmware-amd-graphics libgl1-mesa-dri libglx-mesa0 mesa-vulkan-drivers xserver-xorg-video-all
+    ```
+- Reboot the server.
 
-    - Download `ollama` from the official repository:
-        ```
-        curl -fsSL https://ollama.com/install.sh | sh
-        ```
+### Ollama
 
-    We want our API endpoint to be reachable by the rest of the LAN. For `ollama`, this means setting `OLLAMA_HOST=0.0.0.0` in the `ollama.service`. 
+Ollama, a Docker-based wrapper of `llama.cpp`, serves the inference engine and enables inference from the language models you will download. It'll be installed as a service, so it runs automatically at boot.
 
-    - Run the following command to edit the service:
-        ```
-        systemctl edit ollama.service
-        ```
-    - Find the `[Service]` section and add `Environment="OLLAMA_HOST=0.0.0.0"` under it. It should look like this:
-        ```
-        [Service]
-        Environment="OLLAMA_HOST=0.0.0.0"
-        ```
-    - Save and exit.
-    - Reload the environment.
-        ```
-        systemctl daemon-reload
-        systemctl restart ollama
-        ```
+- Download `ollama` from the official repository:
+    ```
+    curl -fsSL https://ollama.com/install.sh | sh
+    ```
 
-    > [!TIP]
-    > If you installed `ollama` manually or don't use it as a service, remember to run `ollama serve` to properly start the server. Refer to [Ollama's troubleshooting steps](#ollama-2) if you encounter an error.
+We want our API endpoint to be reachable by the rest of the LAN. For `ollama`, this means setting `OLLAMA_HOST=0.0.0.0` in the `ollama.service`.
 
-4. ### Create the `init.bash` script
+- Run the following command to edit the service:
+    ```
+    systemctl edit ollama.service
+    ```
+- Find the `[Service]` section and add `Environment="OLLAMA_HOST=0.0.0.0"` under it. It should look like this:
+    ```
+    [Service]
+    Environment="OLLAMA_HOST=0.0.0.0"
+    ```
+- Save and exit.
+- Reload the environment.
+    ```
+    systemctl daemon-reload
+    systemctl restart ollama
+    ```
 
-    This script will be run at boot to set the GPU power limit and start the server using `ollama`. We set the GPU power limit lower because it has been seen in testing and inference that there is only a 5-15% performance decrease for a 30% reduction in power consumption. This is especially important for servers that are running 24/7.
+> [!TIP]
+> If you installed `ollama` manually or don't use it as a service, remember to run `ollama serve` to properly start the server. Refer to [Ollama's troubleshooting steps](#ollama-3) if you encounter an error.
 
-    - Run the following commands:
-        ```
-        touch init.bash
-        nano init.bash
-        ```
-    - Add the following lines to the script:
-        ```
-        #!/bin/bash
-        sudo nvidia-smi -pm 1
-        sudo nvidia-smi -pl (power_limit)
-        ```
-        > Replace `(power_limit)` with the desired power limit in watts. For example, `sudo nvidia-smi -pl 250`.
+### Startup Script
 
-        For multiple GPUs, modify the script to set the power limit for each GPU:
-        ```
-        sudo nvidia-smi -i 0 -pl (power_limit)
-        sudo nvidia-smi -i 1 -pl (power_limit)
-        ```
-    - Save and exit the script.
-    - Make the script executable:
-        ```
-        chmod +x init.bash
-        ```
+In this step, we'll create a script called `init.bash`. This script will be run at boot to set the GPU power limit and start the server using `ollama`. We set the GPU power limit lower because it has been seen in testing and inference that there is only a 5-15% performance decrease for a 30% reduction in power consumption. This is especially important for servers that are running 24/7.
 
-5. ### Add `init.bash` to the crontab
+- Run the following commands:
+    ```
+    touch init.bash
+    nano init.bash
+    ```
+- Add the following lines to the script:
+    ```
+    #!/bin/bash
+    sudo nvidia-smi -pm 1
+    sudo nvidia-smi -pl (power_limit)
+    ```
+    > Replace `(power_limit)` with the desired power limit in watts. For example, `sudo nvidia-smi -pl 250`.
 
-    Adding the `init.bash` script to the crontab will schedule it to run at boot.
+    For multiple GPUs, modify the script to set the power limit for each GPU:
+    ```
+    sudo nvidia-smi -i 0 -pl (power_limit)
+    sudo nvidia-smi -i 1 -pl (power_limit)
+    ```
+- Save and exit the script.
+- Make the script executable:
+    ```
+    chmod +x init.bash
+    ```
 
-    - Run the following command:
-        ```
-        crontab -e
-        ```
-    - Add the following line to the file:
-        ```
-        @reboot /path/to/init.bash
-        ```
-        > Replace `/path/to/init.bash` with the path to the `init.bash` script.
-    
-    - (Optional) Add the following line to shutdown the server at 12am:
-        ```
-        0 0 * * * /sbin/shutdown -h now
-        ```
-    - Save and exit the file.
+### Scheduling Startup Script
 
-6. ### Give `nvidia-persistenced` and `nvidia-smi` passwordless `sudo` permissions
+Adding the `init.bash` script to the crontab will schedule it to run at boot.
 
-    We want `init.bash` to run the `nvidia-smi` commands without having to enter a password. This is done by editing the `sudoers` file.
+- Run the following command:
+    ```
+    crontab -e
+    ```
+- Add the following line to the file:
+    ```
+    @reboot /path/to/init.bash
+    ```
+    > Replace `/path/to/init.bash` with the path to the `init.bash` script.
 
-    AMD users can skip this step as power limiting is not supported on AMD GPUs.
+- (Optional) Add the following line to shutdown the server at 12am:
+    ```
+    0 0 * * * /sbin/shutdown -h now
+    ```
+- Save and exit the file.
 
-    - Run the following command:
-        ```
-        sudo visudo
-        ```
-    - Add the following lines to the file:
-        ```
-        (username) ALL=(ALL) NOPASSWD: /usr/bin/nvidia-persistenced
-        (username) ALL=(ALL) NOPASSWD: /usr/bin/nvidia-smi
-        ```
-        > Replace `(username)` with your username.
+### Configuring Script Permissions
 
-        > [!IMPORTANT]
-        > Ensure that you add these lines AFTER `%sudo ALL=(ALL:ALL) ALL`. The order of the lines in the file matters - the last matching line will be used so if you add these lines before `%sudo ALL=(ALL:ALL) ALL`, they will be ignored.
-    - Save and exit the file.
+We want `init.bash` to run the `nvidia-smi` commands without having to enter a password. This is done by giving `nvidia-persistenced` and `nvidia-smi` passwordless `sudo` permissions, and can be achieved by editing the `sudoers` file.
 
-7. ### Configure auto-login
+AMD users can skip this step as power limiting is not supported on AMD GPUs.
 
-    When the server boots up, we want it to automatically log in to a user account and run the `init.bash` script. This is done by configuring the `lightdm` display manager.
+- Run the following command:
+    ```
+    sudo visudo
+    ```
+- Add the following lines to the file:
+    ```
+    (username) ALL=(ALL) NOPASSWD: /usr/bin/nvidia-persistenced
+    (username) ALL=(ALL) NOPASSWD: /usr/bin/nvidia-smi
+    ```
+    > Replace `(username)` with your username.
+- Save and exit the file.
 
-    - Run the following command:
-        ```
-        sudo nano /etc/lightdm/lightdm.conf
-        ```
-    - Find the following commented line. It should be in the `[Seat:*]` section.
-        ```
-        # autologin-user=
-        ```
-    - Uncomment the line and add your username:
-        ```
-        autologin-user=(username)
-        ```
-        > Replace `(username)` with your username.
-    - Save and exit the file.
+> [!IMPORTANT]
+> Ensure that you add these lines AFTER `%sudo ALL=(ALL:ALL) ALL`. The order of the lines in the file matters - the last matching line will be used so if you add these lines before `%sudo ALL=(ALL:ALL) ALL`, they will be ignored.
+
+### Configuring Auto-Login
+
+When the server boots up, we want it to automatically log in to a user account and run the `init.bash` script. This is done by configuring the `lightdm` display manager.
+
+- Run the following command:
+    ```
+    sudo nano /etc/lightdm/lightdm.conf
+    ```
+- Find the following commented line. It should be in the `[Seat:*]` section.
+    ```
+    # autologin-user=
+    ```
+- Uncomment the line and add your username:
+    ```
+    autologin-user=(username)
+    ```
+    > Replace `(username)` with your username.
+- Save and exit the file.
 
 ## Additional Setup
 
