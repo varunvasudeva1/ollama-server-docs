@@ -1,6 +1,10 @@
 # Local LLaMA Server Setup Documentation
 
-_TL;DR_: A guide to setting up a fully local and private language model server and TTS-equipped web UI, using [`ollama`](https://github.com/ollama/ollama), [Open WebUI](https://github.com/open-webui/open-webui), and [OpenedAI Speech](https://github.com/matatonic/openedai-speech).
+_TL;DR_: A comprehensive guide to setting up a fully local and private language model server equipped with:
+- an LLM inference engine  [[`ollama`](https://github.com/ollama/ollama)]
+- web platform for chats, RAG, and web search [[Open WebUI](https://github.com/open-webui/open-webui)]
+- text-to-speech server [[OpenedAI Speech](https://github.com/matatonic/openedai-speech)]
+- image generation platform [[ComfyUI](https://github.com/comfyanonymous/ComfyUI)]
 
 ## Table of Contents
 
@@ -13,8 +17,6 @@ _TL;DR_: A guide to setting up a fully local and private language model server a
   - [Essential Setup](#essential-setup)
     - [General](#general)
     - [Drivers](#drivers)
-      - [Nvidia GPUs](#nvidia-gpus)
-      - [AMD GPUs](#amd-gpus)
     - [Ollama](#ollama)
     - [Startup Script](#startup-script)
     - [Scheduling Startup Script](#scheduling-startup-script)
@@ -28,16 +30,20 @@ _TL;DR_: A guide to setting up a fully local and private language model server a
     - [OpenedAI Speech](#openedai-speech)
       - [Open WebUI Integration](#open-webui-integration)
       - [Downloading Voices](#downloading-voices)
+    - [ComfyUI](#comfyui)
+      - [Open WebUI Integration](#open-webui-integration-1)
   - [Verifying](#verifying)
     - [Ollama](#ollama-1)
     - [Open WebUI](#open-webui-1)
     - [OpenedAI Speech](#openedai-speech-1)
+    - [ComfyUI](#comfyui-1)
   - [Updating](#updating)
     - [General](#general-1)
     - [Nvidia Drivers \& CUDA](#nvidia-drivers--cuda)
     - [Ollama](#ollama-2)
     - [Open WebUI](#open-webui-2)
     - [OpenedAI Speech](#openedai-speech-2)
+    - [ComfyUI](#comfyui-2)
   - [Troubleshooting](#troubleshooting)
     - [`ssh`](#ssh-1)
     - [Nvidia Drivers](#nvidia-drivers)
@@ -70,16 +76,15 @@ The process involves installing the NVIDIA drivers, setting the GPU power limit,
 Any modern CPU and GPU combination should work for this guide. Previously, compatibility with AMD GPUs was an issue but the latest releases of `ollama` have worked through this and [AMD GPUs are now supported natively](https://ollama.com/blog/amd-preview). 
 
 For reference, this guide was built around the following system:
-- CPU: Intel Core i5-12600KF
-- Memory: 32GB 6000 MHz DDR5 RAM
-- Storage: 1TB M.2 NVMe SSD
-- GPU: Nvidia RTX 3090 24GB
+- **CPU**: Intel Core i5-12600KF
+- **Memory**: 32GB 6000 MHz DDR5 RAM
+- **Storage**: 1TB M.2 NVMe SSD
+- **GPU**: Nvidia RTX 3090 24GB
 
-> [!NOTE] AMD GPU
-> Power limiting is skipped for AMD GPUs as [AMD has recently made it difficult to set power limits on their GPUs](https://www.reddit.com/r/linux_gaming/comments/1b6l1tz/no_more_power_limiting_for_amd_gpus_because_it_is/). Naturally, skip any steps involving `nvidia-smi` or `nvidia-persistenced` and the power limit in the `init.bash` script.
-
-> [!NOTE] CPU-only
-> You can skip the GPU driver installation and power limiting steps. The rest of the guide should work as expected.
+> [!NOTE]
+> **AMD GPUs**: Power limiting is skipped for AMD GPUs as [AMD has recently made it difficult to set power limits on their GPUs](https://www.reddit.com/r/linux_gaming/comments/1b6l1tz/no_more_power_limiting_for_amd_gpus_because_it_is/). Naturally, skip any steps involving `nvidia-smi` or `nvidia-persistenced` and the power limit in the `init.bash` script.
+> 
+> **CPU-only**: You can skip the GPU driver installation and power limiting steps. The rest of the guide should work as expected.
 
 ## Prerequisites
 
@@ -88,7 +93,7 @@ For reference, this guide was built around the following system:
 - Basic understanding of the Linux terminal
 - Peripherals like a monitor, keyboard, and mouse
 
-To install Debian on your newly built server hardware,
+To install Debian on your newly built server hardware:
 
 - Download the [Debian ISO](https://www.debian.org/distrib/) from the official website.
 - Create a bootable USB using a tool like [Rufus](https://rufus.ie/en/) for Windows or [Balena Etcher](https://etcher.balena.io) for MacOS.
@@ -111,7 +116,7 @@ sudo apt upgrade
 
 Now, we'll install the required GPU drivers that allow programs to utilize their compute capabilities.
 
-#### Nvidia GPUs
+**Nvidia GPUs**
 - Follow Nvidia's [guide on downloading CUDA Toolkit](https://developer.nvidia.com/cuda-downloads?target_os=Linux&target_arch=x86_64&Distribution=Debian). The instructions are specific to your machine and the website will lead you to them interactively.
 - Run the following commands:
     ```
@@ -124,7 +129,7 @@ Now, we'll install the required GPU drivers that allow programs to utilize their
     nvidia-smi
     ```
   
-#### AMD GPUs
+**AMD GPUs**
 - Run the following commands:
     ```
     deb http://deb.debian.org/debian bookworm main contrib non-free-firmware
@@ -294,9 +299,9 @@ Setting up a firewall is essential for securing your server. The Uncomplicated F
     ```
 - Allow SSH, HTTPS, and any other ports you need:
     ```
-    sudo ufw allow ssh https 3000 11434 80 8000 8080
+    sudo ufw allow ssh https 3000 11434 80 8000 8080 8188
     ```
-    Here, we're allowing SSH (port 22), HTTPS (port 443), Open WebUI (port 3000), Ollama API (port 11434), HTTP (port 80), OpenedAI Speech (8000), and Docker (port 8080). You can add or remove ports as needed.
+    Here, we're allowing SSH (port 22), HTTPS (port 443), Open WebUI (port 3000), Ollama (port 11434), HTTP (port 80), OpenedAI Speech (8000), Docker (port 8080), and ComfyUI (port 8188). You can add or remove ports as needed.
 - Enable UFW:
     ```
     sudo ufw enable
@@ -305,6 +310,9 @@ Setting up a firewall is essential for securing your server. The Uncomplicated F
     ```
     sudo ufw status
     ```
+
+> [!WARNING]
+> Enabling UFW without allowing access to port 22 will disrupt your existing SSH connections. If you run a headless setup, this means connecting a monitor to your server and then allowing SSH access through UFW. Be careful to ensure that this port is allowed when making changes to UFW's configuration.
 
 Refer to [this guide](https://www.digitalocean.com/community/tutorials/how-to-set-up-a-firewall-with-ufw-on-debian-10) for more information on setting up UFW.
 
@@ -393,7 +401,8 @@ OpenedAI Speech runs on `0.0.0.0:8000` by default. You can access it by navigati
 
 #### Open WebUI Integration
 
-To integrate your OpenedAI Speech server with Open WebUI, navigate to the `Audio` tab under `Settings` in Open WebUI and set the following values:
+Navigate to `Admin Panel > Settings > Audio` and set the following values:
+
 - Text-to-Speech Engine: `OpenAI`
 - API Base URL: `http://host.docker.internal:8000/v1`
 - API Key: `anything-you-like`
@@ -441,9 +450,73 @@ We'll use Piper here because I haven't found any good resources for high quality
     ```
     > Replace `(openedai_speech_container_ID)` and `(open_webui_container_ID)` with the container IDs you identified.
 
+### ComfyUI
+
+ComfyUI is a popular open-source graph-based tool for generating images using image generation models such as Stable Diffusion XL, Stable Diffusion 3, and the Flux family of models.
+
+- Clone and navigate to the repository:
+    ```
+    git clone https://github.com/comfyanonymous/ComfyUI
+    cd ComfyUI
+    ```
+- Set up a new virtual environment:
+    ```
+    python3 venv -m comfyui
+    source comfyui/bin/activate
+    ```
+- Download the platform-specific dependencies:
+  - Nvidia GPUs
+    ```
+    pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu121
+    ```
+  - AMD GPUs
+    ```
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm6.0
+    ```
+  - Intel GPUs
+  
+    Read the installation instructions from [ComfyUI's GitHub](https://github.com/comfyanonymous/ComfyUI?tab=readme-ov-file#intel-gpus).
+    
+- Download the general dependencies:
+    ```
+    pip install -r requirements.txt
+    ```
+
+Now, we have to download and load a model. Here, we'll use FLUX.1 [dev], a new, state-of-the-art medium-tier model by Black Forest Labs that fits well on an RTX 3090 24GB. Since we want this to be set up as easily as possible, we'll use a complete checkpoint that can be loaded directly into ComfyUI. For a completely customized workflow, CLIPs, VAEs, and models can be downloaded separately. Follow [this guide](https://comfyanonymous.github.io/ComfyUI_examples/flux/#simple-to-use-fp8-checkpoint-version) by ComfyUI's creator to install the FLUX.1 models in a fully customizable way.
+
+> [!NOTE]
+> [FLUX.1 [schnell] HuggingFace](https://huggingface.co/Comfy-Org/flux1-schnell/blob/main/flux1-schnell-fp8.safetensors) (smaller, ideal for <24GB VRAM)
+> 
+> [FLUX.1 [dev] HuggingFace](https://huggingface.co/Comfy-Org/flux1-dev/blob/main/flux1-dev-fp8.safetensors) (larger, ideal for 24GB VRAM)
+
+- Download your desired model into `/models/checkpoints`.
+
+- If you want ComfyUI to be served at boot and effectively run as a service, add the following lines to `init.bash`:
+    ```
+    cd /path/to/comfyui
+    source comfyui/bin/activate
+    python main.py --listen
+    ```
+    > Replace `/path/to/comfyui` with the correct relative path to `init.bash`.
+
+    Otherwise, to run it just once, simply execute the above lines in a terminal window.
+
+#### Open WebUI Integration
+
+Navigate to `Admin Panel > Settings > Images` and set the following values:
+
+- Image Generation Engine: `ComfyUI`
+- API Base URL: `http://localhost:8188`
+
+> [!TIP]
+> You'll either need more than 24GB of VRAM or to use a small language model mostly on CPU to use Open WebUI with FLUX.1 [dev]. FLUX.1 [schnell] and a small language model, however, should fit cleanly in 24GB of VRAM, making for a faster experience if you intend to regularly use both text and image generation together.
+
 ## Verifying
 
 This section isn't strictly necessary by any means - if you use all the elements in the guide, a good experience in Open WebUI means you've succeeded with the goal of the guide. However, it can be helpful to test the disparate installations at different stages in this process.
+
+> [!NOTE]
+> Depending on the machine you conduct these verification tests from, remember to interchange your server's IP address and `localhost` as required.
 
 ### Ollama
 
@@ -478,9 +551,13 @@ sudo apt install aplay
 aplay speech.mp3
 ```
 
+### ComfyUI
+
+Visit `http://localhost:8188`. If you're greeted by the workflow page, you've successfully installed ComfyUI.
+
 ## Updating
 
-Updating your system is a good idea to keep software running optimally and with the latest security patches. Updates to Ollama (a Docker-based wrapper around `llama.cpp`) allow for inference from new model architectures and updates to Open WebUI enable new features like voice calling, function calling, pipelines, and more.
+Updating your system is a good idea to keep software running optimally and with the latest security patches. Updates to Ollama allow for inference from new model architectures and updates to Open WebUI enable new features like voice calling, function calling, pipelines, and more.
 
 I've compiled steps to update these "primary function" installations in a standalone section because I think it'd be easier to come back to one section instead of hunting for update instructions in multiple subsections.
 
@@ -525,6 +602,16 @@ Navigate to the directory and pull the latest image from Docker:
 cd openedai-speech
 sudo docker compose pull
 sudo docker compose up -d
+```
+
+### ComfyUI
+
+Navigate to the directory, pull the latest changes, and update dependencies:
+```
+cd ComfyUI
+git pull
+source comfyui/bin/activate
+pip install -r requirements.txt
 ```
 
 ## Troubleshooting
@@ -651,10 +738,11 @@ Adding CUDA to PATH:
 Docs:
 
 - [Debian](https://www.debian.org/releases/buster/amd64/)
+- [Docker](https://docs.docker.com/engine/install/debian/)
 - [Ollama](https://github.com/ollama/ollama/blob/main/docs/api.md)
-- [Docker for Debian](https://docs.docker.com/engine/install/debian/)
 - [Open WebUI](https://github.com/open-webui/open-webui)
 - [OpenedAI Speech](https://github.com/matatonic/openedai-speech)
+- [ComfyUI](https://github.com/comfyanonymous/ComfyUI)
 
 ## Acknowledgements
 
